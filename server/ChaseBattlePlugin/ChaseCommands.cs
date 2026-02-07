@@ -1,10 +1,11 @@
-using AssettoServer.Server;
-using AssettoServer.Server.Plugin;
+using AssettoServer.Commands;
+using AssettoServer.Commands.Attributes;
+using AssettoServer.Network.Tcp;
 using Qmmands;
 
 namespace ChaseBattlePlugin;
 
-public class ChaseCommands : CheckBaseAttribute
+public class ChaseCommands : ACModuleBase
 {
     private readonly ChaseManager _chaseManager;
 
@@ -13,12 +14,12 @@ public class ChaseCommands : CheckBaseAttribute
         _chaseManager = chaseManager;
     }
 
-    [Command("chase")]
+    [Command("chase"), RequireConnectedPlayer]
     public void ChaseCommand(int targetId)
     {
-        // This would be hooked up to the actual chat command system
-        // For now, this is a placeholder for the logic
-        // var client = Context.Client;
-        // _chaseManager.TryStartBattle(client.SessionId, targetId);
+        // Placeholder implementation
+        // var target = ... (logic to find target by ID)
+        // _chaseManager.TryStartBattle(Client!.SessionId, targetId);
+        Client?.SendChatMessage($"Chase command received for target {targetId}");
     }
 }

@@ -51,7 +51,6 @@
   },
   "projectFileDependencyGroups": {
     "net8.0": [
-      "AssettoServer >= 0.0.60",
       "Serilog >= 2.12.0"
     ]
   },
@@ -97,10 +96,6 @@
       "net8.0": {
         "targetAlias": "net8.0",
         "dependencies": {
-          "AssettoServer": {
-            "target": "Package",
-            "version": "[0.0.60, )"
-          },
           "Serilog": {
             "target": "Package",
             "version": "[2.12.0, )"
@@ -125,16 +120,5 @@
         "runtimeIdentifierGraphPath": "/home/f13/.dotnet/sdk/8.0.417/PortableRuntimeIdentifierGraph.json"
       }
     }
-  },
-  "logs": [
-    {
-      "code": "NU1101",
-      "level": "Error",
-      "message": "找不到包 AssettoServer。源 nuget.org 中不存在具有此 ID 的包",
-      "libraryId": "AssettoServer",
-      "targetGraphs": [
-        "net8.0"
-      ]
-    }
-  ]
+  }
 }

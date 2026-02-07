@@ -1,0 +1,6 @@
+/home/f13/workspace/initial-d-chase-battle/server/ChaseBattlePlugin/obj/Release/net8.0/ChaseBattlePlugin.csproj.AssemblyReference.cache
+/home/f13/workspace/initial-d-chase-battle/server/ChaseBattlePlugin/obj/Release/net8.0/ChaseBattlePlugin.GeneratedMSBuildEditorConfig.editorconfig
+/home/f13/workspace/initial-d-chase-battle/server/ChaseBattlePlugin/obj/Release/net8.0/ChaseBattlePlugin.AssemblyInfoInputs.cache
+/home/f13/workspace/initial-d-chase-battle/server/ChaseBattlePlugin/obj/Release/net8.0/ChaseBattlePlugin.AssemblyInfo.cs
+/home/f13/workspace/initial-d-chase-battle/server/ChaseBattlePlugin/obj/Release/net8.0/ChaseBattlePlugin.csproj.CoreCompileInputs.cache
+/home/f13/workspace/initial-d-chase-battle/server/ChaseBattlePlugin/obj/Release/net8.0/ChaseBattlePlugin.sourcelink.json
