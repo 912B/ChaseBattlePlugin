@@ -1,0 +1,6 @@
+bin/
+obj/
+.dotnet/
+logs/
+dotnet_info.txt
+build_log.txt
