@@ -200,6 +200,9 @@ function CB_Admin.RefreshDrivers()
             table.insert(CB_Admin.Drivers, { id = i, name = ac.getDriverName(i) })
         end
     end
+    -- User requested to simulate a driver. Add a fake one using our own ID so it works with C#
+    local myId = ac.getSim().focusedCar
+    table.insert(CB_Admin.Drivers, { id = myId, name = "[Mock] Virtual Rival" })
 end
 
 ------------------------------------------------------------------------
@@ -269,6 +272,7 @@ CB_Battle.ChaserID = -1
 CB_Battle.LastPosLeader = vec3(0,0,0)
 CB_Battle.LastPosChaser = vec3(0,0,0)
 CB_Battle.ChaserCrossedLine = false
+CB_Battle.CountdownTimer = 0.0
 
 function CB_Battle.SetState(s) 
     CB_Battle.State = s 
@@ -301,6 +305,9 @@ function CB_Battle.SetContestants(payload)
 end
 
 function CB_Battle.OnStart(gridIndex)
+    CB_Battle.SetState(1) -- Countdown State
+    CB_Battle.CountdownTimer = 3.99 -- Starts at 3.99 to show 3, 2, 1
+
     -- Teleport logic
     -- Grid 0: Leader, Grid 1: Chaser
     -- Or reverse depending on track config? usually Leader in front.
@@ -332,7 +339,8 @@ end
 
 function CB_Battle.OnGo()
     CB_Battle.InputLocked = false
-    ac.sendChatMessage("GO! GO! GO!")
+    CB_Battle.SetState(2) -- Active State
+    CB_Visuals.ShowResult("GO!", "RACE STARTED")
 end
 
 function CB_Battle.OnResult(payload)
@@ -343,6 +351,17 @@ function CB_Battle.OnResult(payload)
 end
 
 function CB_Battle.Update(dt)
+    -- 1. Countdown Logic
+    if CB_Battle.State == 1 then
+        CB_Battle.CountdownTimer = CB_Battle.CountdownTimer - dt
+        -- Display countdown dynamically on HUD
+        CB_Visuals.ShowResult(tostring(math.floor(CB_Battle.CountdownTimer)), "GET READY")
+        
+        if CB_Battle.CountdownTimer <= 0 then
+            CB_Battle.OnGo()
+        end
+    end
+
     -- Input Lock Handling for Contestants
     if CB_Battle.InputLocked then
         ac.ext.physicsSetGas(0)
