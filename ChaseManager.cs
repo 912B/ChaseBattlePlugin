@@ -13,6 +13,10 @@ public class ChaseManager
     // Key: Leader SessionID, Value: ChaseBattle
     private readonly Dictionary<int, ChaseBattle> _activeBattles = new();
 
+    private ACTcpClient? _leader;
+    private ACTcpClient? _chaser;
+    private int _currentState = 0; // 0:Idle, 1:Countdown, 2:Active, 3:Finished
+
     public ChaseManager(EntryCarManager entryCarManager)
     {
         _entryCarManager = entryCarManager;
@@ -39,12 +43,43 @@ public class ChaseManager
         }
     }
 
+    private void BroadcastProtocol(string opcode, string payload = "")
+    {
+        var msg = $"CHASE_BATTLE:{opcode}:{payload}";
+        _entryCarManager.BroadcastPacket(new ChatMessage { SessionId = 255, Message = msg });
+    }
+
     public void Reset()
     {
         _activeBattles.Clear();
+        _leader = null;
+        _chaser = null;
+        _currentState = 0;
         Log.Information("Chase Manager Reset by Admin.");
         _entryCarManager.BroadcastPacket(new ChatMessage { SessionId = 255, Message = "Chase Battle System has been RESET by Admin." });
-        _entryCarManager.BroadcastPacket(new ChatMessage { SessionId = 255, Message = "CHASE_END" });
+        BroadcastProtocol("STATE", "0");
+    }
+
+    public void SetContestants(ACTcpClient leader, ACTcpClient chaser)
+    {
+        _leader = leader;
+        _chaser = chaser;
+        _currentState = 0;
+        BroadcastProtocol("SETUP", $"{leader.SessionId},{chaser.SessionId}");
+    }
+
+    public void StartBattle()
+    {
+        if (_leader == null || _chaser == null) return;
+        
+        _currentState = 1;
+        BroadcastProtocol("START", "");
+        
+        // Let Lua handle the countdown and Go logic, or we can handle it here.
+        // If Lua does it automatically after START, we just wait for RESULT.
+        // Wait, the TryStartBattle was adding to _activeBattles for disconnect logic, let's keep that
+        _activeBattles.Clear();
+        _activeBattles.Add(_leader.SessionId, new ChaseBattle(_leader, _chaser));
     }
 
     public bool TryStartBattle(ACTcpClient leader, ACTcpClient chaser)
@@ -55,14 +90,8 @@ public class ChaseManager
             return false;
         }
 
-        var battle = new ChaseBattle(leader, chaser);
-        _activeBattles.Add(leader.SessionId, battle);
-        
-        Log.Information($"Chase Battle Started: {leader.Name} (Leader) vs {chaser.Name} (Chaser)");
-        
-        // Notify clients to start Lua logic
-        // Notify clients to start Lua logic
-        _entryCarManager.BroadcastPacket(new ChatMessage { SessionId = 255, Message = $"CHASE_START: {leader.SessionId} vs {chaser.SessionId}" });
+        SetContestants(leader, chaser);
+        StartBattle();
 
         return true;
     }
@@ -82,9 +111,6 @@ public class ChaseManager
             _entryCarManager.BroadcastPacket(new ChatMessage { SessionId = 255, Message = "Chase Result: DRAW! Swapping roles..." });
             
             // Auto-Swap and Restart
-            // Small delay to ensure clients process the end message? 
-            // Actually, immediate might be fine, but let's just call it.
-            // We need to swap: Chaser becomes Leader
             bool success = TryStartBattle(battle.Chaser, battle.Leader);
             if (!success)
             {
@@ -94,24 +120,23 @@ public class ChaseManager
         else if (result == "GIVEUP")
         {
             Log.Information($"Chase Forfeit: {reporter.Name} gave up.");
-            // Reporter lost
             var winner = battle.Leader == reporter ? battle.Chaser : battle.Leader;
             string message = $"Chase Result: {winner.Name} WON! ({reporter.Name} gave up)";
             _entryCarManager.BroadcastPacket(new ChatMessage { SessionId = 255, Message = message });
+            BroadcastProtocol("RESULT", "GIVEUP");
         }
         else
         {
- 
             string message = result == "WIN" 
                 ? $"Chase Result: {battle.Chaser.Name} CAUGHT {battle.Leader.Name}!" 
                 : $"Chase Result: {battle.Leader.Name} ESCAPED from {battle.Chaser.Name}!";
                 
             Log.Information($"Chase Ended: {message}");
             _entryCarManager.BroadcastPacket(new ChatMessage { SessionId = 255, Message = message });
+            BroadcastProtocol("RESULT", result);
         }
 
-        // Send Leader SessionID to identify which battle ended (for HUD cleanup)
-        _entryCarManager.BroadcastPacket(new ChatMessage { SessionId = 255, Message = $"CHASE_END: {battle.Leader.SessionId}" }); 
+        _currentState = 0;
     }
 }
 

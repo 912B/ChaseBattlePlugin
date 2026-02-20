@@ -72,10 +72,37 @@ public class ChaseCommands : ACModuleBase
         _chaseManager.ReportResult(Client!, result);
     }
 
-    [Command("chase_reset"), RequireAdmin]
-    public void ChaseResetCommand()
+    [Command("chase_cmd"), RequireAdmin]
+    public void ChaseCmdCommand(string action, string payload = "")
     {
-        _chaseManager.Reset();
-        Client?.SendPacket(new ChatMessage { SessionId = 255, Message = "Chase manager reset." });
+        Log.Information($"ChaseCmd Received: {action} {payload}");
+        
+        if (action == "SET_ROLES")
+        {
+            var parts = payload.Split(',');
+            if (parts.Length == 2 && int.TryParse(parts[0], out int leaderId) && int.TryParse(parts[1], out int chaserId))
+            {
+                var leader = _entryCarManager.EntryCars.FirstOrDefault(c => c.Client?.SessionId == leaderId)?.Client;
+                var chaser = _entryCarManager.EntryCars.FirstOrDefault(c => c.Client?.SessionId == chaserId)?.Client;
+
+                if (leader != null && chaser != null)
+                {
+                    _chaseManager.SetContestants(leader, chaser);
+                    Client?.SendPacket(new ChatMessage { SessionId = 255, Message = $"Roles set: Leader={leader.Name}, Chaser={chaser.Name}" });
+                }
+                else
+                {
+                    Client?.SendPacket(new ChatMessage { SessionId = 255, Message = "Could not find one or both drivers." });
+                }
+            }
+        }
+        else if (action == "START")
+        {
+            _chaseManager.StartBattle();
+        }
+        else if (action == "STOP")
+        {
+            _chaseManager.Reset();
+        }
     }
 }
