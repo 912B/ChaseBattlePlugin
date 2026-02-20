@@ -124,8 +124,8 @@ function CB_Admin.DrawAdminPanel()
     local sim = ac.getSim()
     local isAuthorized = CB_Admin.IsAdmin or sim.isAdmin
 
-    -- Use ui.window to create an interactive standard panel
-    ui.window("Chase Battle Admin", vec2(20, 100), vec2(300, 380), function()
+    -- Use ui.toolWindow with inputs = true to capture clicks
+    ui.toolWindow("Chase Battle Admin", vec2(20, 100), vec2(300, 380), false, true, function()
         if not isAuthorized then
             ui.text("You are not currently authorized as Admin.")
             if ui.button("Check Admin Privileges") then
