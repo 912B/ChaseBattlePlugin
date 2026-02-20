@@ -135,7 +135,7 @@ function CB_Admin.DrawAdminPanel()
         end
 
         ui.text("Status: " .. CB_Battle.GetStateName())
-        ui.SameLine()
+        ui.sameLine()
         if ui.button("Force Refresh") then CB_Admin.RefreshDrivers() end
         
         ui.separator()
@@ -151,9 +151,9 @@ function CB_Admin.DrawAdminPanel()
         for _, driver in ipairs(CB_Admin.Drivers) do
              ui.pushID(driver.id)
              if ui.button("L") then CB_Admin.SelectedLeader = driver.id end
-             ui.SameLine()
+             ui.sameLine()
              if ui.button("C") then CB_Admin.SelectedChaser = driver.id end
-             ui.SameLine()
+             ui.sameLine()
              
              local color = rgbm(1,1,1,1)
              if driver.id == CB_Admin.SelectedLeader then color = rgbm(0,1,0,1) end
@@ -183,7 +183,7 @@ function CB_Admin.DrawAdminPanel()
         if ui.button("START BATTLE", vec2(130, 0)) then ac.sendChatMessage("/chase_cmd START") end
         ui.popStyleColor()
         
-        ui.SameLine()
+        ui.sameLine()
         
         ui.pushStyleColor(ui.StyleColor.Button, stopColor)
         if ui.button("STOP / RESET", vec2(130, 0)) then ac.sendChatMessage("/chase_cmd STOP") end
