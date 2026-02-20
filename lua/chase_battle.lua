@@ -124,15 +124,16 @@ function CB_Admin.DrawAdminPanel()
     local sim = ac.getSim()
     local isAuthorized = CB_Admin.IsAdmin or sim.isAdmin
 
-    -- Draw UI Window explicitly on screen
-    ui.beginTransparentWindow("Chase Battle Admin", vec2(20, 100), vec2(300, 380))
+    -- Draw an interactive UI Window explicitly on screen
+    -- beginWindow natively catches mouse interactions
+    ui.beginWindow("Chase Battle Admin", vec2(20, 100), vec2(300, 380))
     
     if not isAuthorized then
         ui.text("You are not currently authorized as Admin.")
         if ui.button("Check Admin Privileges") then
             ac.checkAdminPrivileges()
         end
-        ui.endTransparentWindow()
+        ui.endWindow()
         return
     end
 
@@ -191,7 +192,7 @@ function CB_Admin.DrawAdminPanel()
     if ui.button("STOP / RESET", vec2(130, 0)) then ac.sendChatMessage("/chase_cmd STOP") end
     ui.popStyleColor()
     
-    ui.endTransparentWindow()
+    ui.endWindow()
 end
 
 ------------------------------------------------------------------------
