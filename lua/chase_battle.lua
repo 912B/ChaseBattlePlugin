@@ -118,6 +118,11 @@ function CB_Admin.Update(dt)
             CB_Admin.RefreshTimer = 0
         end
     end
+end
+
+function CB_Admin.DrawAdminPanel()
+    local sim = ac.getSim()
+    local isAuthorized = CB_Admin.IsAdmin or sim.isAdmin
 
     -- Draw UI Window explicitly on screen
     ui.beginTransparentWindow("Chase Battle Admin", vec2(20, 100), vec2(300, 380))
@@ -189,239 +194,6 @@ function CB_Admin.Update(dt)
     ui.endTransparentWindow()
 end
 
-function CB_Admin.RefreshDrivers()
-    CB_Admin.Drivers = {}
-    for i = 0, ac.getSim().carsCount - 1 do
-        local c = ac.getCar(i)
-        if c and c.isConnected then
-            table.insert(CB_Admin.Drivers, { id = i, name = ac.getDriverName(i) })
-        end
-    end
-end
-
-------------------------------------------------------------------------
--- CB_Spectator: Input Locking
-------------------------------------------------------------------------
-CB_Spectator.IsSpectating = false
-CB_Spectator.TeleportTimer = 0
-
-function CB_Spectator.Update(dt)
-    if not CB_Spectator.IsSpectating then return end
-    
-    -- Only active during battle states (Countdown/Active)
-    -- If Idle, spectators can roam? Spec implies "Not Contestant".
-    -- If server sends SETUP, we are SPEC.
-    -- We should only lock when State > 0.
-    if CB_Battle.State == 0 then return end
-
-    -- Lock Inputs
-    ac.setDisplayMessage("Spectator Mode", "Battle in Progress - Controls Locked")
-    
-    -- Physics Lock
-    ac.ext.physicsSetGas(0)
-    ac.ext.physicsSetBrake(1)
-    ac.ext.physicsSetClutch(1)
-    ac.ext.physicsSetGear(0)
-    ac.ext.physicsSetSteer(0)
-    
-    -- Force Pit Return logic (Optional: if user drives out, port back)
-    -- For now, just Lock is sufficient as they can't drive.
-    -- But if they were on track when battle started, they are stuck on track.
-    -- Server should teleport them or we do it here.
-    -- C# ChaseManager doesn't teleport spectators effectively (can't target easily).
-    -- So Lua does it.
-    
-    -- If car is not in pitbox (velocity > 1 or distance from pit > 5m?), Teleport.
-    -- Simplify: Just force camera to different view?
-    -- Let's attempt to use ac.ext.teleportTo(pit) if possible.
-    -- Or just rely on input lock. 
-    -- User requirement: "传送回pit 并锁定油门".
-    
-    if CB_Spectator.TeleportTimer < 1.0 then -- Try teleport once at start of mode
-        ac.sendChatMessage("/box") -- Server command to teleport to pit? 
-        -- Or CSP:
-        -- ac.ext.physicsSetCarPosition(...) to pit spawn?
-        -- We don't know pit spawn easily.
-        -- "/box" or "/pits" chat command is standard for some servers.
-        -- AssettoServer might handle "/teleport_pit"?
-        -- Let's assume Input Lock is the primary mechanism and the user accepts "stuck where they are" if teleport fails, 
-        -- OR we rely on a standard AC function if available. 
-        -- `ac.returnToPit()` exists in some CSP versions? 
-        -- Let's try `ac.sendChatMessage("/mid-race-spectate")` if server supports it.
-        
-        -- Fallback: Just lock.
-        CB_Spectator.TeleportTimer = CB_Spectator.TeleportTimer + dt
-    end
-end
-
-------------------------------------------------------------------------
--- CB_Battle: Core Logic
-------------------------------------------------------------------------
-CB_Battle.State = 0 -- 0:Idle, 1:Countdown, 2:Active, 3:Finished
-CB_Battle.Role = "NONE" -- LEAD, CHASE, SPEC
-CB_Battle.LeaderID = -1
-CB_Battle.ChaserID = -1
-
--- State Tracking
-CB_Battle.LastPosLeader = vec3(0,0,0)
-CB_Battle.LastPosChaser = vec3(0,0,0)
-CB_Battle.ChaserCrossedLine = false
-
-function CB_Battle.SetState(s) 
-    CB_Battle.State = s 
-    if s == 0 then
-        CB_Battle.ChaserCrossedLine = false
-    end
-end
-
-function CB_Battle.GetStateName() 
-    local names = { [0]="Idle", [1]="Countdown", [2]="Active", [3]="Finished" }
-    return names[CB_Battle.State] or "Unknown"
-end
-
-function CB_Battle.SetContestants(payload)
-    local lId, cId = payload:match("([^,]+),([^,]+)")
-    CB_Battle.LeaderID = tonumber(lId)
-    CB_Battle.ChaserID = tonumber(cId)
-    
-    local myId = car.index
-    if myId == CB_Battle.LeaderID then CB_Battle.Role = "LEAD"
-    elseif myId == CB_Battle.ChaserID then CB_Battle.Role = "CHASE"
-    else CB_Battle.Role = "SPEC" end
-    
-    CB_Spectator.IsSpectating = (CB_Battle.Role == "SPEC")
-    
-    -- Log Role for Debug
-    if CB_Battle.Role ~= "SPEC" then
-        ac.log("Chase Battle Role Assigned: " .. CB_Battle.Role)
-    end
-end
-
-function CB_Battle.OnStart(gridIndex)
-    -- Teleport logic
-    -- Grid 0: Leader, Grid 1: Chaser
-    -- Or reverse depending on track config? usually Leader in front.
-    local myGrid = -1
-    if CB_Battle.Role == "LEAD" then myGrid = 0
-    elseif CB_Battle.Role == "CHASE" then myGrid = 1 end
-    
-    if myGrid ~= -1 then
-        -- Use CSP teleport if available, or reset to pit then move?
-        -- physics.teleportTo is not standard Lua API but standard Assetto usually allows "restart".
-        -- Server probably handles the restart logic or we need to teleport manually.
-        -- Assuming "START" signal implies we should be at start.
-        -- Since we can't easily teleport in standard Lua without CSP extension `physics.setCarPosition`, we rely on that.
-        -- If `ac.ext` is available:
-        if ac.ext and ac.ext.physicsSetCarPosition then
-             -- We need spawn positions. 
-             -- Valid approach: ac.getSpawnPosition(gridIndex)
-             -- Need to verify API. ac.getSpawnPoint(index) exists!
-             local spawn = ac.getSpawnPoint(myGrid)
-             ac.ext.physicsSetCarPosition(car.index, spawn.position, spawn.look, spawn.up)
-             ac.ext.physicsSetVelocity(car.index, vec3(0,0,0), vec3(0,0,0))
-        end
-    end
-    
-    -- Lock Input
-    CB_Battle.InputLocked = true
-end
-
-function CB_Battle.OnGo()
-    CB_Battle.InputLocked = false
-    ac.sendChatMessage("GO! GO! GO!")
-end
-
-function CB_Battle.OnResult(payload)
-    local winner, reason = payload:match("([^,]+),([^,]+)")
-    ac.log("Battle Result: " .. (winner or "") .. " Reason: " .. (reason or ""))
-    -- Show UI notification (Big Text)
-    CB_Visuals.ShowResult(winner, reason)
-end
-
-function CB_Battle.Update(dt)
-    -- Input Lock Handling for Contestants
-    if CB_Battle.InputLocked then
-        ac.ext.physicsSetGas(0)
-        ac.ext.physicsSetBrake(1)
-        ac.ext.physicsSetClutch(1)
-        ac.ext.physicsSetGear(0)
-        return -- Skip logic if locked
-    end
-
-    if CB_Battle.State ~= 2 then return end -- Only Active
-    
-    -- We need positions of BOTH cars.
-    -- In Client Lua, getting opponent position requires `ac.getCar(id)`
-    local leaderCar = ac.getCar(CB_Battle.LeaderID)
-    local chaserCar = ac.getCar(CB_Battle.ChaserID)
-    
-    if not leaderCar or not chaserCar then return end
-    
-    -- We assume `script.update` calls this, so `car` global is MY car.
-    -- Logic runs on both clients independently? 
-    -- Ideally logic runs on Leader or Chaser or Both and reports.
-    -- To avoid double reporting, usually Leader reports win/loss, or both do.
-    -- Server handles deduplication.
-    
-    -- Let's run logic on EVERYONE involved (Leader/Chaser)
-    if CB_Battle.Role == "SPEC" then return end
-
-    local lPos = leaderCar.position
-    local cPos = chaserCar.position
-    
-    -- 0. Update Last Pos (Initial)
-    if CB_Battle.LastPosLeader == vec3(0,0,0) then CB_Battle.LastPosLeader = lPos end
-    if CB_Battle.LastPosChaser == vec3(0,0,0) then CB_Battle.LastPosChaser = cPos end
-
-    -- 1. Check Overtake (Chaser Wins if ahead of Leader by > 5m? No, just ahead)
-    -- "Distance < -5m (Chaser in front)"
-    -- We calculate Spline Dist
-    local lSpline = leaderCar.splinePosition
-    local cSpline = chaserCar.splinePosition
-    
-    -- Correct Spline wrapping if needed (Track loop)
-    if lSpline < 0.1 and cSpline > 0.9 then lSpline = lSpline + 1 end
-    
-    local splineGap = (lSpline - cSpline) 
-    -- Approximate gap in meters (Need track length? ac.getTrackLength())
-    local trackLen = ac.getTrackLength()
-    local gapM = splineGap * trackLen
-    
-    if gapM < -5 then
-         -- Chaser is 5m ahead of Leader -> Chaser WIN
-         ac.sendChatMessage("/chasereport WIN") 
-         CB_Battle.State = 3 -- Prevent double report locally
-         return
-    end
-    
-    -- 2. Check Chase Line Crossing (Chaser)
-    local chaserCrossed = CB_Utils.CheckPlaneCrossing(CB_Battle.LastPosChaser, cPos, CB_Config.ChasePos, CB_Config.ChaseFwd)
-    if chaserCrossed then
-        CB_Battle.ChaserCrossedLine = true
-        ac.log("Chaser Crossed Chase Line!")
-    end
-
-    -- 3. Check Finish Line Crossing (Leader)
-    local leaderFinished = CB_Utils.CheckPlaneCrossing(CB_Battle.LastPosLeader, lPos, CB_Config.FinishPos, CB_Config.FinishFwd)
-    
-    if leaderFinished then
-        ac.log("Leader Finished!")
-        -- Leader reached finish. Check Chaser status.
-        if CB_Battle.ChaserCrossedLine then
-             -- Chaser already crossed Chase Line -> DRAW
-             ac.sendChatMessage("/chasereport DRAW")
-        else
-             -- Chaser NOT crossed Chase Line -> Leader Wins (Escape)
-             ac.sendChatMessage("/chasereport LOSS") 
-        end
-        CB_Battle.State = 3
-    end
-
-    -- Update Last Pos
-    CB_Battle.LastPosLeader = lPos
-    CB_Battle.LastPosChaser = cPos
-end
-
 ------------------------------------------------------------------------
 -- Main Loop hooks (Called from footer)
 ------------------------------------------------------------------------
@@ -432,9 +204,14 @@ function script.update(dt)
     CB_Admin.Update(dt)
     CB_Spectator.Update(dt)
     CB_Battle.Update(dt)
-    
-    -- Visuals
+end
+
+function script.draw3D(dt)
     CB_Visuals.DrawD3()
+end
+
+function script.drawUI(dt)
+    CB_Admin.DrawAdminPanel()
     CB_Visuals.DrawHUD()
 end
 
