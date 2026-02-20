@@ -57,7 +57,7 @@ public class ChaseManager
         _currentState = 0;
         Log.Information("Chase Manager Reset by Admin.");
         _entryCarManager.BroadcastPacket(new ChatMessage { SessionId = 255, Message = "Chase Battle System has been RESET by Admin." });
-        BroadcastProtocol("STATE", "0");
+        BroadcastProtocol("STATE", _currentState.ToString());
     }
 
     public void SetContestants(ACTcpClient leader, ACTcpClient chaser)
